@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleção de Produtos</title>
+    <style>
+        /* Estilos simplificados para melhorar a aparência */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            background-size: cover;
+            background-position: center;
+            background-size: 50% auto;
+            background-repeat: no-repeat;
+            align-items: center;
+            height: 100vh;
+            background-color: #e0e5eb;
+        }
+
+        .container {
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            /* Adicionando opacidade ao container */
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            padding: 10px;
+            margin-bottom: 10px;
+            width: 300px;
+            font-size: 16px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 8px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            display: flex;
+        }
+
+        li:hover {
+            background-color: #f9f9f9;
+        }
+
+        .product-image {
+            width: 50px;
+            height: 50px;
+            margin-right: 10px;
+            cursor: pointer; /* Adiciona cursor apontando para indicar que a imagem é clicável */
+        }
+
+        #itensEscolhidos li {
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: #3283d382;
+            color: #fff;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            /* Alterado para empilhar elementos verticalmente */
+            align-items: flex-start;
+            /* Alinhamento à esquerda */
+        }
+
+        .product-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .product-name {
+            font-weight: bold;
+        }
+
+        .product-price {
+            color: #000;
+            /* Alterado para preto para melhorar a legibilidade */
+            font-size: 16px;
+            /* Aumentado o tamanho da fonte */
+            margin-top: 5px;
+            /* Espaçamento superior para separar o nome do produto do preço */
+            padding: 10px;
+        }
+
+        .selected-client {
+            display: none;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .cliente {
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+
+        .cliente p {
+            margin: 0;
+        }
+
+        .cliente .label {
+            font-weight: bold;
+        }
+
+        .discount-input {
+            padding: 5px;
+            width: 70px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        /* Estilos para a imagem ampliada */
+        .modal {
+            display: none; /* Oculta o modal por padrão */
+            position: fixed;
+            z-index: 1;
+            padding-top: 100px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0,0,0);
+            background-color: rgba(0,0,0,0.9);
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            width: 80%;
+            max-width: 700px;
+        }
+
+        .modal-content img {
+            width: 100%;
+            height: auto;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Seleção de Produtos</h2>
+        <input type="text" id="nomeProduto" placeholder="Digite o nome do produto">
+        <ul id="listaSugestoes"></ul>
+        <h3>Itens Selecionados</h3>
+        <ul id="itensEscolhidos"></ul>
+        <div class="selected-client">
+            <h3>Seleção de Cliente</h3>
+            <input type="text" id="nomeCliente" placeholder="Digite o nome e sobrenome do cliente">
+            <!-- Campo único para nome e sobrenome -->
+            <div id="listaClientes"></div>
+            <!-- Div para exibir sugestões de clientes -->
+            <div id="clienteSelecionado" class="cliente" style="display: none;"></div>
+            <button onclick="finalizarCompra()">Finalizar Compra</button>
+        </div>
+        <div class="loading">Carregando...</div>
+        <button id="prosseguirBtn" onclick="prosseguir()">Prosseguir</button>
+        <!-- Div para exibir cliente selecionado -->
+    </div>
+
+    <!-- Modal para visualização ampliada da imagem -->
+    <div id="modal" class="modal">
+        <span class="close" onclick="fecharModal()">&times;</span>
+        <img class="modal-content" id="imagemAmpliada">
+    </div>
+
+    <script>
+        // Array para armazenar os itens selecionados
+        const itensSelecionados = [];
+
+        // Seleciona a lista de itens escolhidos no DOM
+        const listaItensEscolhidos = document.getElementById('itensEscolhidos');
+
+        // Função para buscar sugestões de produtos conforme o usuário digita
+        function buscarSugestoes(nome) {
+            return fetch(`https://ecommtools.madeiranit.com.br/buscarsugestoes?nome=${nome}`)
+                .then(response => response.json());
+        }
+
+        // Função para buscar sugestões de clientes conforme o usuário digita
+        function buscarSugestoesCliente(nome) {
+            return fetch(`https://ecommtools.madeiranit.com.br/buscarcliente?nome=${nome}`)
+                .then(response => response.json());
+        }
+
+        // Função para exibir sugestões de produtos
+        let timeoutId; // Variável para armazenar o ID do timeout
+
+        function exibirSugestoes() {
+            const nomeProduto = document.getElementById('nomeProduto').value;
+            const listaSugestoes = document.getElementById('listaSugestoes');
+
+            // Limpar a sugestão anterior antes de exibir a nova
+            listaSugestoes.innerHTML = '';
+
+            // Verifica se há algo digitado no campo
+            if (nomeProduto.trim() !== '') {
+                // Cancela o timeout anterior, se existir
+                clearTimeout(timeoutId);
+
+                // Define um novo timeout para 2 segundos após o usuário terminar de digitar
+                timeoutId = setTimeout(() => {
+                    // Busca as sugestões de produtos
+                    buscarSugestoes(nomeProduto)
+                        .then(sugestoes => {
+                            // Exibe as sugestões na lista
+                            sugestoes.forEach(sugestao => {
+                                const li = document.createElement('li');
+                                const img = document.createElement('img');
+                                // Torna a URL da imagem absoluta
+                                img.src = 'https://www.madeiranit.com.br/media/catalog/product' + sugestao.imagem;
+                                img.alt = sugestao.nome;
+                                img.classList.add('product-image');
+                                li.appendChild(img);
+                                const productInfo = document.createElement('div');
+                                productInfo.classList.add('product-info');
+                                const spanName = document.createElement('span');
+                                spanName.textContent = sugestao.nome;
+                                spanName.classList.add('product-name');
+                                productInfo.appendChild(spanName);
+                                const spanPrice = document.createElement('span');
+                                spanPrice.textContent = 'Preço: R$ ' + sugestao.preco;
+                                spanPrice.classList.add('product-price');
+                                productInfo.appendChild(spanPrice);
+                                li.appendChild(productInfo);
+                                // Adiciona um evento de clique para selecionar o item
+                                li.addEventListener('click', () => {
+                                    adicionarItemSelecionado(sugestao);
+                                });
+                                listaSugestoes.appendChild(li);
+                            });
+                        });
+                }, 500); // Atraso de 2 segundos (2000 milissegundos)
+            }
+        }
+
+        // Função para exibir sugestões de clientes
+        let timeoutIdCliente; // Variável para armazenar o ID do timeout
+
+        function exibirSugestoesCliente() {
+            // Verifica se o botão "Prosseguir" foi clicado
+            const prosseguirBtn = document.getElementById('prosseguirBtn');
+            if (prosseguirBtn.style.display === 'none') {
+                const nomeCliente = document.getElementById('nomeCliente').value;
+                const listaClientes = document.getElementById('listaClientes');
+
+                // Limpar a sugestão anterior antes de exibir a nova
+                listaClientes.innerHTML = '';
+
+                // Verifica se há algo digitado no campo
+                if (nomeCliente.trim() !== '') {
+                    // Cancela o timeout anterior, se existir
+                    clearTimeout(timeoutIdCliente);
+
+                    // Define um novo timeout para 2 segundos após o usuário terminar de digitar
+                    timeoutIdCliente = setTimeout(() => {
+                        // Busca as sugestões de clientes
+                        buscarSugestoesCliente(nomeCliente)
+                            .then(sugestoes => {
+                                // Exibe as sugestões na lista
+                                sugestoes.forEach(sugestao => {
+                                    const divCliente = document.createElement('div');
+                                    divCliente.classList.add('cliente');
+                                    divCliente.addEventListener('click', () => {
+                                        selecionarCliente(sugestao);
+                                    });
+                                    divCliente.innerHTML = `
+                                        <p><span class="label">Nome:</span> <strong>${sugestao.nome} ${sugestao.sobrenome}</strong></p>
+                                        <p><span class="label">Email:</span> ${sugestao.email}</p>
+                                        <p><span class="label">Telefone:</span> ${sugestao.endereco ? sugestao.endereco.telefone : 'Não informado'}</p>
+                                    `;
+                                    listaClientes.appendChild(divCliente);
+                                });
+                            });
+                    }, 500); // Atraso de 2 segundos (2000 milissegundos)
+                }
+            }
+        }
+
+        // Função para adicionar item selecionado à lista de itens escolhidos
+        function adicionarItemSelecionado(item) {
+            // Cria um novo elemento li para o item selecionado
+            const li = document.createElement('li');
+            document.getElementById('listaSugestoes').innerHTML = '';
+
+            // Adiciona a imagem do produto ao elemento li
+            const img = document.createElement('img');
+            img.src = 'https://www.madeiranit.com.br/media/catalog/product' + item.imagem;
+            img.alt = item.nome;
+            img.classList.add('product-image');
+            img.addEventListener('click', () => {
+                exibirImagemAmpliada(item.imagem);
+            }); // Adiciona um evento de clique para ampliar a imagem
+            li.appendChild(img);
+
+            // Adiciona o nome do produto ao elemento li
+            const productName = document.createElement('span');
+            productName.textContent = item.nome;
+            productName.classList.add('product-name');
+            li.appendChild(productName);
+
+            // Adiciona o preço do produto ao elemento li
+            const productPrice = document.createElement('span');
+            productPrice.textContent = 'Preço: R$ ' + item.preco;
+            productPrice.classList.add('product-price');
+            li.appendChild(productPrice);
+
+            // Adiciona um campo de input para o percentual de desconto
+            const discountInput = document.createElement('input');
+            discountInput.type = 'number';
+            discountInput.placeholder = 'Desconto (%)';
+            discountInput.min = '0';
+            discountInput.max = '100';
+            discountInput.step = '1';
+            discountInput.classList.add('discount-input');
+            discountInput.addEventListener('blur', () => {
+                atualizarPrecoComDesconto(li, item.preco, discountInput.value);
+            });
+            li.appendChild(discountInput);
+
+            // Adiciona o novo elemento li à lista de itens escolhidos
+            listaItensEscolhidos.appendChild(li);
+
+            // Adiciona o item à lista de itens selecionados
+            itensSelecionados.push({
+                ...item,
+                desconto: 0
+            }); // Inicialmente, o desconto é 0%
+        }
+
+        // Função para atualizar o preço do item com o desconto
+        function atualizarPrecoComDesconto(li, preco, desconto) {
+            const precoComDesconto = preco * (1 - desconto / 100);
+            const productPrice = li.querySelector('.product-price');
+            productPrice.textContent = 'Preço: R$ ' + precoComDesconto.toFixed(2);
+        }
+
+        // Função para selecionar um cliente
+        function selecionarCliente(cliente) {
+            document.getElementById('listaClientes').innerHTML = '';
+            document.getElementById('nomeCliente').value = cliente.nome; // Preenchendo o campo de nome com o nome completo
+            const clienteSelecionado = document.getElementById('clienteSelecionado');
+            clienteSelecionado.innerHTML = `
+                <p><span class="label">Nome:</span> <strong>${cliente.nome} ${cliente.sobrenome}</strong></p>
+                <p><span class="label">Email:</span> ${cliente.email}</p>
+                ${cliente.endereco ? `<p><span class="label">Telefone:</span> ${cliente.endereco.telefone}</p>` : ''} <!-- Verifica se endereco existe -->
+                <p><span class="label">Endereço:</span> ${cliente.endereco ? `${cliente.endereco.rua}, ${cliente.endereco.cidade}, ${cliente.endereco.estado}, ${cliente.endereco.cep}, ${cliente.endereco.pais}` : 'Endereço não disponível'}</p> <!-- Verifica se endereco existe -->
+            `;
+            clienteSelecionado.style.display = 'block'; // Exibe a div clienteSelecionado
+        }
+
+        // Função para prosseguir para a seleção do cliente
+        function prosseguir() {
+            document.getElementById('prosseguirBtn').style.display = 'none';
+            document.querySelector('.selected-client').style.display = 'block';
+            document.querySelector('h2').style.display = 'none';
+            // Oculta a lista de sugestões de produtos e o campo de digitação
+            document.getElementById('listaSugestoes').style.display = 'none';
+            document.getElementById('nomeProduto').style.display = 'none';
+        }
+
+        // Função para finalizar a compra
+        function finalizarCompra() {
+            const nomeCliente = document.getElementById('nomeCliente').value;
+            // Aqui você pode implementar a lógica para finalizar a compra
+            // Isso pode envolver enviar os itens selecionados e o nome do cliente para o backend, por exemplo
+            alert('Compra finalizada! Cliente: ' + nomeCliente + ', Itens: ' + itensSelecionados.map(item => item.nome).join(', '));
+        }
+
+        // Função para exibir a imagem ampliada
+        function exibirImagemAmpliada(imagem) {
+            const modal = document.getElementById('modal');
+            const modalImg = document.getElementById('imagemAmpliada');
+            modal.style.display = 'block';
+            modalImg.src = 'https://www.madeiranit.com.br/media/catalog/product' + imagem;
+        }
+
+        // Função para fechar a imagem ampliada
+        function fecharModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        // Adiciona um evento de digitação para atualizar as sugestões de produtos conforme o usuário digita
+        document.getElementById('nomeProduto').addEventListener('input', exibirSugestoes);
+        document.getElementById('nomeCliente').addEventListener('input', exibirSugestoesCliente); // Adicionando evento para o campo de nome de cliente
+    </script>
+</body>
+
+</html>
